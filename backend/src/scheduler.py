@@ -107,36 +107,42 @@ class NewsScheduler:
             if topic_summaries:
                 logger.info("Starting email distribution")
                 
-                # Group users by topic
-                users_by_topic = {}
+                # Get all users and their topics
+                users_data = []
                 for user_doc in users:
                     user_data = user_doc.to_dict()
-                    user_topic = user_data.get('topic')
-                    if user_topic:
-                        if user_topic not in users_by_topic:
-                            users_by_topic[user_topic] = []
-                        users_by_topic[user_topic].append(user_data)
+                    users_data.append(user_data)
                 
                 # Send emails for each topic that has a summary
                 for topic, topic_data in topic_summaries.items():
-                    if topic in users_by_topic:
-                        logger.info(f"Sending emails for topic: {topic}")
-                        for user_data in users_by_topic[topic]:
-                            try:
-                                email_sent = await self.email_service.send_summary(
-                                    topic_data['summary'],
-                                    topic_data['articles'],
-                                    user_data['email'],
-                                )
+                    logger.info(f"Sending emails for topic: {topic}")
+                    
+                    # Find all users subscribed to this topic
+                    topic_users = [user for user in users_data if user.get('topic') == topic]
+                    
+                    if not topic_users:
+                        logger.warning(f"No users found for topic: {topic}")
+                        continue
+                        
+                    logger.info(f"Found {len(topic_users)} users for topic: {topic}")
+                    
+                    # Send email to each user
+                    for user_data in topic_users:
+                        try:
+                            email_sent = await self.email_service.send_summary(
+                                topic_data['summary'],
+                                topic_data['articles'],
+                                user_data['email']
+                            )
+                            
+                            if email_sent:
+                                logger.info(f"Successfully sent email to {user_data['email']} for topic {topic}")
+                            else:
+                                logger.error(f"Failed to send email to {user_data['email']} for topic {topic}")
                                 
-                                if email_sent:
-                                    logger.info(f"Successfully sent email to {user_data['email']} for topic {topic}")
-                                else:
-                                    logger.error(f"Failed to send email to {user_data['email']} for topic {topic}")
-                                    
-                            except Exception as e:
-                                logger.error(f"Error sending email to {user_data['email']}: {str(e)}")
-                                continue
+                        except Exception as e:
+                            logger.error(f"Error sending email to {user_data['email']}: {str(e)}")
+                            continue
                 
                 logger.info("Email distribution completed")
             
