@@ -1,11 +1,40 @@
 from quart import Blueprint, request, jsonify
 from .config.firebase import db
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from google.cloud import firestore
 import traceback
+from .utils.firebase import get_active_topics, has_active_users
+import logging
+from typing import List, Dict, Any
+from firebase_admin import firestore
+from .news_processor.news_fetcher import NewsFetcher
+from .news_processor.content_extractor import ContentExtractor
+from .news_processor.processor import Processor
+from .news_processor.summarizer import Summarizer
+
+logger = logging.getLogger(__name__)
 
 main_bp = Blueprint('main', __name__)
+
+@main_bp.route('/topics', methods=['GET'])
+def get_topics():
+    """Get all active topics from the database."""
+    try:
+        logger.info("Fetching active topics")
+        topics = get_active_topics()
+        logger.info(f"Found {len(topics)} active topics")
+        
+        return jsonify({
+            'topics': topics
+        }), 200
+    except Exception as e:
+        logger.error(f"Error fetching topics: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': 'Failed to fetch topics',
+            'message': str(e)
+        }), 500
 
 @main_bp.route('/subscribe', methods=['POST'])
 async def subscribe():
@@ -21,7 +50,7 @@ async def subscribe():
         print(f"\n=== New Subscription Request ===")
         print(f"Email: {email}")
         print(f"Name: {name}")
-        print(f"Topic: {topic}")
+        print(f"Topics: {topic}")
         print(f"Raw data: {data}")
         
         if not all([email, name, topic]):
@@ -76,7 +105,7 @@ async def subscribe():
             user_data = {
                 'email': email,
                 'name': name,
-                'topic': topic,
+                'topics': topic,
                 'createdAt': datetime.utcnow(),
                 'status': 'active'
             }
@@ -121,15 +150,13 @@ async def unsubscribe():
             return {'error': 'Invalid request', 'message': 'No JSON data provided'}, 400
             
         email = data.get('email', '').strip().lower()  # Normalize email
-        topic = data.get('topic', '').strip()
         
         print(f"\n=== Unsubscribe Request ===")
         print(f"Email: {email}")
-        print(f"Topic: {topic}")
         print(f"Raw data: {data}")
         
-        if not all([email, topic]):
-            return {'error': 'Please provide both email and topic'}, 400
+        if not email:
+            return {'error': 'Email is required'}, 400
         
         # Find and delete user
         users_ref = db.collection('users')
@@ -147,28 +174,17 @@ async def unsubscribe():
                     'message': 'No subscription found for this email address.'
                 }, 404
             
-            # Delete all matching subscriptions
-            deleted = False
+            # Delete the subscription
             for doc in query_result:
-                if doc.get('topic') == topic:
-                    print(f"\n=== Deleting Subscription ===")
-                    print(f"Deleting subscription for email: {email}, topic: {topic}")
-                    doc.reference.delete()
-                    deleted = True
+                print(f"\n=== Deleting Subscription ===")
+                print(f"Deleting subscription for email: {email}")
+                doc.reference.delete()
             
-            if deleted:
-                print(f"\n=== Success ===")
-                print(f"Successfully unsubscribed user: {email}")
-                return {
-                    'message': 'Successfully unsubscribed from the newsletter.'
-                }, 200
-            else:
-                print(f"\n=== No Match Found ===")
-                print(f"No matching subscription found for email: {email}, topic: {topic}")
-                return {
-                    'error': 'Subscription not found',
-                    'message': 'No subscription found for this email and topic combination.'
-                }, 404
+            print(f"\n=== Success ===")
+            print(f"Successfully unsubscribed user: {email}")
+            return {
+                'message': 'Successfully unsubscribed from the newsletter.'
+            }, 200
                 
         except Exception as db_error:
             print(f"\n=== Database Error ===")
@@ -194,19 +210,221 @@ async def unsubscribe():
 
 @main_bp.route('/test', methods=['POST'])
 async def test_email():
+    """Test endpoint for admin functionality including news fetching, content extraction, and summarization."""
     try:
         data = await request.get_json()
         password = data.get('password')
         
         if not password:
+            logger.warning("Test request received without password")
             return jsonify({'error': 'Password is required'}), 400
         
         # Validate admin password
         if password != os.getenv('ADMIN_PWD'):
+            logger.warning("Invalid admin password provided")
             return jsonify({'error': 'Invalid password'}), 401
         
-        # TODO: Implement test email functionality
-        return jsonify({'message': 'Test email will be sent'}), 200
+        logger.info("Admin authentication successful, proceeding with test operations")
+        
+        # Initialize components
+        news_fetcher = NewsFetcher()
+        content_extractor = ContentExtractor()
+        summarizer = Summarizer()
+        
+        # Step 1: Fetch news articles
+        logger.info("Starting news fetch for 'Artificial Intelligence News'")
+        articles = await news_fetcher.search_news("Artificial Intelligence News", "week")
+        
+        if not articles:
+            logger.warning("No articles found in the search")
+            return jsonify({
+                'status': 'success',
+                'message': 'No articles found',
+                'articles': []
+            }), 200
+        
+        logger.info(f"Successfully fetched {len(articles)} articles")
+        
+        # Step 2: Extract content from articles
+        logger.info("Starting content extraction for fetched articles")
+        processed_articles = []
+        
+        for i, article in enumerate(articles, 1):
+            try:
+                logger.info(f"Extracting content for article {i}/{len(articles)}: {article['title']}")
+                content = await content_extractor.extract_content(article['link'])
+                
+                if content:
+                    processed_article = {
+                        **article,
+                        **content
+                    }
+                    processed_articles.append(processed_article)
+                    logger.info(f"Successfully extracted content for article {i}")
+                else:
+                    logger.warning(f"Failed to extract content for article {i}")
+                    
+            except Exception as e:
+                logger.error(f"Error processing article {i}: {str(e)}")
+                logger.debug(f"Article details: {article}")
+                continue
+        
+        logger.info(f"Content extraction completed. Successfully processed {len(processed_articles)} articles")
+        
+        # Step 3: Generate summaries
+        logger.info("Starting content summarization")
+        summarized_articles = await summarizer.batch_summarize(processed_articles)
+        
+        logger.info(f"Summarization completed. Successfully summarized {len(summarized_articles)} articles")
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Processed and summarized {len(summarized_articles)} articles',
+            'articles': summarized_articles
+        }), 200
     
     except Exception as e:
-        return jsonify({'error': str(e)}), 500 
+        logger.error(f"Error in test endpoint: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@main_bp.route('/articles', methods=['GET'])
+async def get_articles():
+    """Get all processed articles with optional filtering."""
+    try:
+        # Get query parameters
+        topic = request.args.get('topic')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        limit = int(request.args.get('limit', 10))
+        
+        # Initialize Firestore
+        db = firestore.client()
+        articles_ref = db.collection('processed_articles')
+        
+        # Build query
+        query = articles_ref
+        
+        if topic:
+            query = query.where('topic', '==', topic)
+            
+        if start_date:
+            try:
+                start_dt = datetime.fromisoformat(start_date)
+                query = query.where('processed_at', '>=', start_dt.isoformat())
+            except ValueError:
+                return jsonify({'error': 'Invalid start_date format. Use ISO format (YYYY-MM-DD)'}), 400
+                
+        if end_date:
+            try:
+                end_dt = datetime.fromisoformat(end_date)
+                query = query.where('processed_at', '<=', end_dt.isoformat())
+            except ValueError:
+                return jsonify({'error': 'Invalid end_date format. Use ISO format (YYYY-MM-DD)'}), 400
+        
+        # Execute query
+        articles = await query.order_by('processed_at', direction=firestore.Query.DESCENDING).limit(limit).get()
+        
+        # Format results
+        results = []
+        for article in articles:
+            article_data = article.to_dict()
+            article_data['id'] = article.id
+            results.append(article_data)
+            
+        return jsonify({
+            'count': len(results),
+            'articles': results
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error fetching articles: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/articles/recent', methods=['GET'])
+async def get_recent_articles():
+    """Get recent articles (last 7 days) with optional topic filter."""
+    try:
+        topic = request.args.get('topic')
+        limit = int(request.args.get('limit', 10))
+        
+        # Calculate date range
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=7)
+        
+        # Initialize Firestore
+        db = firestore.client()
+        articles_ref = db.collection('processed_articles')
+        
+        # Build query
+        query = articles_ref.where('processed_at', '>=', start_date.isoformat())
+        
+        if topic:
+            query = query.where('topic', '==', topic)
+            
+        # Execute query
+        articles = await query.order_by('processed_at', direction=firestore.Query.DESCENDING).limit(limit).get()
+        
+        # Format results
+        results = []
+        for article in articles:
+            article_data = article.to_dict()
+            article_data['id'] = article.id
+            results.append(article_data)
+            
+        return jsonify({
+            'count': len(results),
+            'articles': results
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error fetching recent articles: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@main_bp.route('/test/news', methods=['GET'])
+async def test_news_fetcher():
+    """Test endpoint for news fetcher functionality."""
+    try:
+        # Get query parameters
+        query = request.args.get('query', 'AI technology')
+        time_period = request.args.get('time_period', 'week')
+        
+        # Initialize news fetcher
+        news_fetcher = NewsFetcher()
+        
+        # Fetch news articles
+        articles = await news_fetcher.search_news(query, time_period)
+        
+        if not articles:
+            return jsonify({
+                'status': 'success',
+                'message': 'No articles found',
+                'articles': []
+            }), 200
+        
+        # Initialize content extractor
+        content_extractor = ContentExtractor()
+        
+        # Extract content for the first article
+        first_article = articles[0]
+        content = await content_extractor.extract_content(first_article['link'])
+        
+        if content:
+            first_article.update(content)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Found {len(articles)} articles',
+            'articles': articles,
+            'sample_content': first_article if content else None
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error in news fetcher test: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500 
