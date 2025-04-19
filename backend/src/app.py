@@ -1,30 +1,59 @@
+"""
+Main application module for the AI News Research Assistant.
+"""
 import os
 from pathlib import Path
 from dotenv import load_dotenv
 from quart import Quart
-from quart_cors import cors  # Using Quart-CORS instead of Flask-CORS
+from quart_cors import cors
+from .routes import main_bp
+from .scheduler import NewsScheduler
+import logging
 
-# Load environment variables from the backend directory
-env_path = Path(__file__).parent.parent / '.env'
-load_dotenv(env_path)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 def create_app():
+    """Create and configure the Quart application."""
+    # Load environment variables
+    env_path = Path(__file__).parent.parent / '.env'
+    load_dotenv(env_path)
+    
+    # Create the Quart app
     app = Quart(__name__)
     
-    # Configure CORS using Quart-CORS
-    app = cors(app, allow_origin="*")
-    
-    # Basic configuration
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
-    app.config['MAX_USERS'] = int(os.getenv('MAX_USERS', 100))
+    # Configure CORS
+    cors(app, allow_origin="*")
     
     # Register blueprints
-    from .routes import main_bp
     app.register_blueprint(main_bp)
     
-    @app.route('/health', methods=['GET'])
-    async def health_check():
-        return {'status': 'healthy'}, 200
+    # Initialize scheduler
+    scheduler = NewsScheduler()
+    
+    @app.before_serving
+    async def startup():
+        """Start the scheduler when the application starts."""
+        try:
+            scheduler.start()
+            logger.info("Application started successfully")
+        except Exception as e:
+            logger.error(f"Failed to start application: {str(e)}")
+            raise
+    
+    @app.after_serving
+    async def shutdown():
+        """Stop the scheduler when the application shuts down."""
+        try:
+            scheduler.stop()
+            logger.info("Application stopped successfully")
+        except Exception as e:
+            logger.error(f"Error stopping application: {str(e)}")
+            raise
     
     return app
 
