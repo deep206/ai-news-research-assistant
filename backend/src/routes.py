@@ -12,6 +12,7 @@ from .news_processor.news_fetcher import NewsFetcher
 from .news_processor.content_extractor import ContentExtractor
 from .news_processor.processor import Processor
 from .news_processor.summarizer import Summarizer
+from .services.email_service import EmailService
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ async def subscribe():
         print(f"\n=== New Subscription Request ===")
         print(f"Email: {email}")
         print(f"Name: {name}")
-        print(f"Topics: {topic}")
+        print(f"Topic: {topic}")
         print(f"Raw data: {data}")
         
         if not all([email, name, topic]):
@@ -80,7 +81,7 @@ async def subscribe():
                     duplicate_found = True
                     break
                 print(f"  Name: {user_data['name']}")
-                print(f"  Topic: {user_data['topic']}")
+                print(f"  Topic: {user_data.get('topic', 'N/A')}")
             
             if duplicate_found:
                 print(f"\n=== Duplicate Found ===")
@@ -105,7 +106,7 @@ async def subscribe():
             user_data = {
                 'email': email,
                 'name': name,
-                'topics': topic,
+                'topic': topic,
                 'createdAt': datetime.utcnow(),
                 'status': 'active'
             }
@@ -210,7 +211,7 @@ async def unsubscribe():
 
 @main_bp.route('/test', methods=['POST'])
 async def test_email():
-    """Test endpoint for admin functionality including news fetching, content extraction, and summarization."""
+    """Test endpoint for admin functionality including news fetching, content extraction, summarization, and email sending."""
     try:
         data = await request.get_json()
         password = data.get('password')
@@ -230,6 +231,7 @@ async def test_email():
         news_fetcher = NewsFetcher()
         content_extractor = ContentExtractor()
         summarizer = Summarizer()
+        email_service = EmailService()
         
         # Step 1: Fetch news articles
         logger.info("Starting news fetch for 'Artificial Intelligence News'")
@@ -273,14 +275,41 @@ async def test_email():
         
         # Step 3: Generate summaries
         logger.info("Starting content summarization")
-        summarized_articles = await summarizer.batch_summarize(processed_articles)
+        summary_result = await summarizer.batch_summarize(processed_articles)
         
-        logger.info(f"Summarization completed. Successfully summarized {len(summarized_articles)} articles")
+        if not summary_result.get('summary'):
+            logger.error("Failed to generate summary")
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to generate summary',
+                'articles': processed_articles
+            }), 500
         
+        logger.info(f"Summarization completed. Successfully summarized {len(processed_articles)} articles")
+        
+        # Step 4: Send test email
+        logger.info("Sending test email with summary")
+        email_sent = await email_service.send_summary(
+            summary_result['summary'],
+            processed_articles
+        )
+        
+        if not email_sent:
+            logger.error("Failed to send test email")
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to send test email',
+                'summary': summary_result['summary'],
+                'articles': processed_articles
+            }), 500
+
+        logger.info("Test email sent successfully")
         return jsonify({
             'status': 'success',
-            'message': f'Processed and summarized {len(summarized_articles)} articles',
-            'articles': summarized_articles
+            'message': f'Processed {len(processed_articles)} articles and sent test email',
+            'summary': summary_result['summary'],
+            'articles': processed_articles,
+            'email_sent': True
         }), 200
     
     except Exception as e:
@@ -384,47 +413,134 @@ async def get_recent_articles():
         logger.error(f"Error fetching recent articles: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@main_bp.route('/test/news', methods=['GET'])
-async def test_news_fetcher():
-    """Test endpoint for news fetcher functionality."""
+@main_bp.route('/unsubscribe-email', methods=['GET'])
+async def unsubscribe_email():
+    """Handle user unsubscription via direct email link."""
     try:
-        # Get query parameters
-        query = request.args.get('query', 'AI technology')
-        time_period = request.args.get('time_period', 'week')
+        # Get email from query parameters
+        email = request.args.get('email')
+        if not email:
+            return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Error</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                    .error { color: #dc3545; font-size: 24px; margin-bottom: 20px; }
+                    .message { color: #333; font-size: 16px; }
+                </style>
+            </head>
+            <body>
+                <div class="error">✕</div>
+                <div class="message">Email parameter is required for unsubscription.</div>
+            </body>
+            </html>
+            """
         
-        # Initialize news fetcher
-        news_fetcher = NewsFetcher()
+        # Normalize email
+        email = email.strip().lower()
         
-        # Fetch news articles
-        articles = await news_fetcher.search_news(query, time_period)
+        print(f"\n=== Unsubscribe Request (Email Link) ===")
+        print(f"Email: {email}")
         
-        if not articles:
-            return jsonify({
-                'status': 'success',
-                'message': 'No articles found',
-                'articles': []
-            }), 200
-        
-        # Initialize content extractor
-        content_extractor = ContentExtractor()
-        
-        # Extract content for the first article
-        first_article = articles[0]
-        content = await content_extractor.extract_content(first_article['link'])
-        
-        if content:
-            first_article.update(content)
-        
-        return jsonify({
-            'status': 'success',
-            'message': f'Found {len(articles)} articles',
-            'articles': articles,
-            'sample_content': first_article if content else None
-        }), 200
-        
+        # Find and delete user
+        users_ref = db.collection('users')
+        try:
+            # Use the recommended filter syntax
+            query = users_ref.where(filter=firestore.FieldFilter('email', '==', email))
+            query_result = query.get()
+            print(f"Query result length: {len(query_result)}")
+            
+            if len(query_result) == 0:
+                print(f"\n=== No User Found ===")
+                print(f"No user found with email: {email}")
+                return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Error</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                        .error { color: #dc3545; font-size: 24px; margin-bottom: 20px; }
+                        .message { color: #333; font-size: 16px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="error">✕</div>
+                    <div class="message">No subscription found for this email address.</div>
+                </body>
+                </html>
+                """
+            
+            # Delete the subscription
+            for doc in query_result:
+                print(f"\n=== Deleting Subscription ===")
+                print(f"Deleting subscription for email: {email}")
+                doc.reference.delete()
+            
+            print(f"\n=== Success ===")
+            print(f"Successfully unsubscribed user: {email}")
+            return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Unsubscribe Successful</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                    .success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
+                    .message { color: #333; font-size: 16px; }
+                </style>
+            </head>
+            <body>
+                <div class="success">✓</div>
+                <div class="message">You have been successfully unsubscribed from our newsletter.</div>
+            </body>
+            </html>
+            """
+                
+        except Exception as db_error:
+            print(f"\n=== Database Error ===")
+            print(f"Error type: {type(db_error)}")
+            print(f"Error message: {str(db_error)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return """
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Error</title>
+                <style>
+                    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                    .error { color: #dc3545; font-size: 24px; margin-bottom: 20px; }
+                    .message { color: #333; font-size: 16px; }
+                </style>
+            </head>
+            <body>
+                <div class="error">✕</div>
+                <div class="message">An error occurred while processing your request. Please try again later.</div>
+            </body>
+            </html>
+            """
+    
     except Exception as e:
-        logger.error(f"Error in news fetcher test: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500 
+        print(f"\n=== Error Occurred ===")
+        print(f"Error type: {type(e)}")
+        print(f"Error message: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Error</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+                .error { color: #dc3545; font-size: 24px; margin-bottom: 20px; }
+                .message { color: #333; font-size: 16px; }
+            </style>
+        </head>
+        <body>
+            <div class="error">✕</div>
+            <div class="message">An unexpected error occurred. Please try again later.</div>
+        </body>
+        </html>
+        """
