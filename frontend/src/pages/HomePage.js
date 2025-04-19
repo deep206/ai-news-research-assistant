@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Container,
   Typography,
@@ -20,14 +20,26 @@ const HomePage = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
   const [showUnsubscribe, setShowUnsubscribe] = useState(false);
+  const [topics, setTopics] = useState([]);
+  const [topicsLoading, setTopicsLoading] = useState(true);
+  const [topicsError, setTopicsError] = useState(null);
 
-  // Available topics - we'll move this to a config file later
-  const topics = [
-    { value: 'Artificial Intelligence', label: 'Artificial Intelligence' },
-    { value: 'Machine Learning', label: 'Machine Learning' },
-    { value: 'Natural Language Processing', label: 'Natural Language Processing' },
-    { value: 'Robotics', label: 'Robotics' },
-  ];
+  useEffect(() => {
+    const fetchTopics = async () => {
+      try {
+        const response = await axios.get('http://localhost:5000/topics');
+        setTopics(response.data.topics);
+        setTopicsError(null);
+      } catch (error) {
+        setTopicsError('Failed to load available topics. Please try again later.');
+        console.error('Error fetching topics:', error);
+      } finally {
+        setTopicsLoading(false);
+      }
+    };
+
+    fetchTopics();
+  }, []);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -112,6 +124,12 @@ const HomePage = () => {
           </Alert>
         )}
 
+        {topicsError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {topicsError}
+          </Alert>
+        )}
+
         <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
           <TextField
             fullWidth
@@ -142,19 +160,26 @@ const HomePage = () => {
             onChange={handleChange}
             required
             margin="normal"
+            disabled={topicsLoading}
           >
-            {topics.map((option) => (
-              <MenuItem key={option.value} value={option.value}>
-                {option.label}
+            {topicsLoading ? (
+              <MenuItem value="">
+                <em>Loading topics...</em>
               </MenuItem>
-            ))}
+            ) : (
+              topics.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))
+            )}
           </TextField>
           <Button
             type="submit"
             variant="contained"
             color="primary"
             fullWidth
-            disabled={loading}
+            disabled={loading || topicsLoading}
             sx={{ mt: 2 }}
           >
             {loading ? <CircularProgress size={24} /> : 'Subscribe'}
