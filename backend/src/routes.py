@@ -4,7 +4,7 @@ import os
 from datetime import datetime, timedelta
 from google.cloud import firestore
 import traceback
-from .utils.firebase import get_active_topics, has_active_users
+from .utils.firebase import get_active_topics
 import logging
 from typing import List, Dict, Any
 from firebase_admin import firestore
