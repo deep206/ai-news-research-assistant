@@ -1,27 +1,29 @@
-from flask import Flask
-from flask_cors import CORS
-from dotenv import load_dotenv
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+from quart import Quart
+from quart_cors import cors  # Using Quart-CORS instead of Flask-CORS
 
-# Load environment variables
-load_dotenv()
+# Load environment variables from the backend directory
+env_path = Path(__file__).parent.parent / '.env'
+load_dotenv(env_path)
 
 def create_app():
-    app = Flask(__name__)
+    app = Quart(__name__)
     
-    # Configure CORS
-    CORS(app, resources={r"/*": {"origins": "*"}})
+    # Configure CORS using Quart-CORS
+    app = cors(app, allow_origin="*")
     
     # Basic configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
     app.config['MAX_USERS'] = int(os.getenv('MAX_USERS', 100))
     
-    # Register blueprints (we'll create these later)
-    # from .routes import main_bp
-    # app.register_blueprint(main_bp)
+    # Register blueprints
+    from .routes import main_bp
+    app.register_blueprint(main_bp)
     
     @app.route('/health', methods=['GET'])
-    def health_check():
+    async def health_check():
         return {'status': 'healthy'}, 200
     
     return app
