@@ -1,0 +1,14 @@
+firebase-admin==6.4.0
+google-cloud-firestore==2.13.1
+google-generativeai==0.3.2
+python-dotenv==1.0.1
+flask==3.0.2
+flask-cors==4.0.0
+requests==2.31.0
+scrapy==2.11.1
+cryptography==42.0.5
+apscheduler==3.10.4
+python-dateutil==2.8.2
+pytest==8.0.2
+black==24.2.0
+flake8==7.0.0 
