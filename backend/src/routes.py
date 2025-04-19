@@ -1,4 +1,4 @@
-from quart import Blueprint, request
+from quart import Blueprint, request, jsonify
 from .config.firebase import db
 import os
 from datetime import datetime
@@ -193,16 +193,16 @@ async def unsubscribe():
         }, 500
 
 @main_bp.route('/test', methods=['POST'])
-def test_email():
+async def test_email():
     try:
-        data = request.get_json()
+        data = await request.get_json()
         password = data.get('password')
         
         if not password:
             return jsonify({'error': 'Password is required'}), 400
         
         # Validate admin password
-        if encryption_manager.decrypt(password) != os.getenv('ADMIN_PWD'):
+        if password != os.getenv('ADMIN_PWD'):
             return jsonify({'error': 'Invalid password'}), 401
         
         # TODO: Implement test email functionality
