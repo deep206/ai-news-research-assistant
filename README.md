@@ -125,26 +125,17 @@ MAX_USERS=100
 
 // users collection
 {
-  id: string,
   email: string,
   name: string,
   createdAt: timestamp,
-  lastUpdated: timestamp
+  status: string,
+  topic: string
 }
 
 // topics collection
 {
-  id: string,
   name: string,        // Display name for users
   searchTerms: string, // Terms used for SerpApi search
   isActive: boolean    // Whether the topic is available for subscription
-}
-
-// subscriptions collection
-{
-  userId: string,
-  topicId: string,
-  createdAt: timestamp,
-  status: 'active' | 'inactive'
 }
 ```
