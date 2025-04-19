@@ -287,11 +287,14 @@ async def test_email():
         
         logger.info(f"Summarization completed. Successfully summarized {len(processed_articles)} articles")
         
+        send_to_email = os.getenv('SEND_TEST_EMAIL_TO')
+
         # Step 4: Send test email
         logger.info("Sending test email with summary")
         email_sent = await email_service.send_summary(
             summary_result['summary'],
-            processed_articles
+            processed_articles,
+            send_to_email
         )
         
         if not email_sent:

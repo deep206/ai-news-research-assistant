@@ -19,10 +19,6 @@ class EmailService:
         if not self.api_key:
             raise ValueError("BREVO_API_KEY environment variable is not set")
         
-        self.send_to_email = os.getenv('SEND_TEST_EMAIL_TO')
-        if not self.send_to_email:
-            raise ValueError("SEND_TEST_EMAIL_TO environment variable is not set")
-        
         self.base_url = "https://api.brevo.com/v3"
         self.headers = {
             "accept": "application/json",
@@ -30,7 +26,7 @@ class EmailService:
             "content-type": "application/json"
         }
 
-    def _create_html_content(self, summary: str, articles: List[Dict]) -> str:
+    def _create_html_content(self, summary: str, articles: List[Dict], send_to_email: str) -> str:
         """
         Create HTML content for the email.
         
@@ -77,11 +73,11 @@ class EmailService:
             """
         
         # Add footer
-        html_content += """
+        html_content += f"""
             </div>
             <div class="footer">
                 <p>This is an automated newsletter from AI News Research Assistant.</p>
-                <p>To unsubscribe, please visit our website or <a href="{self.frontend_url}/unsubscribe-email?email={self.send_to_email}">click here</a>.</p>
+                <p>To unsubscribe, please visit our website or <a href="{self.frontend_url}/unsubscribe-email?email={send_to_email}">click here</a>.</p>
             </div>
         </body>
         </html>
@@ -89,7 +85,7 @@ class EmailService:
         
         return html_content
 
-    async def send_summary(self, summary: str, articles: List[Dict]) -> bool:
+    async def send_summary(self, summary: str, articles: List[Dict], send_to_email: str) -> bool:
         """
         Send a summary email to the configured test email address.
         
@@ -102,7 +98,7 @@ class EmailService:
         """
         try:
             # Create HTML content
-            html_content = self._create_html_content(summary, articles)
+            html_content = self._create_html_content(summary, articles, send_to_email)
             
             # Prepare email data
             email_data = {
@@ -110,7 +106,7 @@ class EmailService:
                     "name": "AI News Research Assistant",
                     "email": os.getenv('FROM_EMAIL')
                 },
-                "to": [{"email": self.send_to_email}],
+                "to": [{"email": send_to_email}],
                 "subject": "Test News Summary",
                 "htmlContent": html_content
             }
@@ -125,7 +121,7 @@ class EmailService:
             )
             
             if response.status_code == 201:
-                logger.info(f"Test email sent successfully to {self.send_to_email}")
+                logger.info(f"Test email sent successfully to {send_to_email}")
                 return True
             else:
                 logger.error(f"Failed to send test email. Status code: {response.status_code}")

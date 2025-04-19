@@ -1,168 +1,170 @@
 """
 Scheduler module for periodic news processing.
 """
+import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
-from apscheduler.triggers.date import DateTrigger
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
-from .news_processor.processor import Processor
-from firebase_admin import firestore
-import asyncio
-from .utils.firebase import has_active_users, get_active_topics
+from .news_processor.news_fetcher import NewsFetcher
+from .news_processor.content_extractor import ContentExtractor
+from .news_processor.summarizer import Summarizer
 from .services.email_service import EmailService
-import os
+from firebase_admin import firestore
 
 logger = logging.getLogger(__name__)
 
 class NewsScheduler:
     def __init__(self):
         self.scheduler = AsyncIOScheduler()
-        self.processor = Processor()
+        self.news_fetcher = NewsFetcher()
+        self.content_extractor = ContentExtractor()
+        self.summarizer = Summarizer()
         self.email_service = EmailService()
         self.db = firestore.client()
-        self.job_id = 'news_processing'
-        
-    def start(self):
-        """Start the scheduler and add the news processing job."""
-        try:
-            # Remove any existing job first
-            if self.scheduler.get_job(self.job_id):
-                self.scheduler.remove_job(self.job_id)
-                logger.info("Removed existing job before scheduling new one")
-            
-            # For local testing, run immediately and only once
-            if os.getenv('NODE_ENV') == 'development' and os.getenv('RUN_CRON_JOB') == 'true':
-                # Schedule job to run immediately
-                self.scheduler.add_job(
-                    self.process_and_store_news,
-                    DateTrigger(run_date=datetime.now() + timedelta(seconds=5)),  # Run after 5 seconds
-                    id=self.job_id,
-                    name='Process and store news articles (One-time)',
-                    replace_existing=True,
-                    max_instances=1  # Ensure only one instance runs at a time
-                )
-                logger.info("Development mode: Scheduled one-time news processing job")
-            else:
-                # Production: Schedule job to run every Sunday at 7 AM ET
-                self.scheduler.add_job(
-                    self.process_and_store_news,
-                    CronTrigger(
-                        day_of_week='sun',
-                        hour=7,
-                        minute=0,
-                        timezone='America/New_York'
-                    ),
-                    id=self.job_id,
-                    name='Process and store news articles',
-                    replace_existing=True,
-                    max_instances=1  # Ensure only one instance runs at a time
-                )
-                logger.info("Production mode: Scheduled weekly news processing job")
-            
-            self.scheduler.start()
-            logger.info("News scheduler started successfully")
-            
-        except Exception as e:
-            logger.error(f"Failed to start scheduler: {str(e)}")
-            raise
 
     async def process_and_store_news(self):
-        """Process news articles and store them in Firestore."""
+        """Process news articles and send emails to users."""
         try:
-            logger.info("Starting news processing job")
+            logger.info("Starting weekly news processing job")
             
-            # Check if there are any active users
-            if not has_active_users():
-                logger.info("No active users found. Skipping news processing.")
+            # Step 1: Get all active users
+            users_ref = self.db.collection('users')
+            users = users_ref.where('status', '==', 'active').get()
+            
+            if not users:
+                logger.info("No active users found, skipping processing")
                 return
-            
-            # Get all active topics
-            active_topics = get_active_topics()
-            if not active_topics:
-                logger.warning("No active topics found for processing")
-                return
-            
-            # Create a dictionary mapping topic values to their search terms
-            topic_search_terms = {}
-            for topic in active_topics:
-                topic_value = topic.get('value')
-                search_terms = topic.get('searchTerms', [])
-                if topic_value and search_terms:
-                    topic_search_terms[topic_value] = search_terms
-            
-            if not topic_search_terms:
-                logger.warning("No valid topics found for processing")
-                return
-            
-            # Process each topic
-            results = await self.processor.process_topics(topic_search_terms)
-            
-            # Store results in Firestore and prepare for email sending
-            topic_articles = {}  # Store articles by topic for email sending
-            for topic_value, articles in results.items():
-                if articles:
-                    # Create a batch for this topic's articles
-                    batch = self.db.batch()
-                    collection_ref = self.db.collection('processed_articles')
-                    
-                    # Add each article to the batch
-                    for article in articles:
-                        # Create a document reference with a unique ID
-                        doc_ref = collection_ref.document()
-                        batch.set(doc_ref, {
-                            **article,
-                            'topic': topic_value,
-                            'processed_at': datetime.utcnow().isoformat(),
-                            'status': 'processed'
-                        })
-                    
-                    # Commit the batch
-                    batch.commit()
-                    logger.info(f"Stored {len(articles)} articles for topic: {topic_value}")
-                    
-                    # Store articles for email sending
-                    topic_articles[topic_value] = articles
-            
-            # Send emails to users based on their topics
-            if topic_articles:
-                logger.info("Starting email distribution")
-                users_ref = self.db.collection('users')
-                query = users_ref.where('status', '==', 'active')
-                users = query.get()
                 
+            logger.info(f"Found {len(users)} active users")
+            
+            # Step 2: Get all active topics
+            topics_ref = self.db.collection('topics')
+            topics = topics_ref.where('isActive', '==', True).get()
+            
+            if not topics:
+                logger.warning("No active topics found")
+                return
+                
+            logger.info(f"Found {len(topics)} active topics")
+            
+            # Step 3: Process each topic
+            topic_summaries = {}  # Store summaries by topic
+            
+            for topic in topics:
+                topic_data = topic.to_dict()
+                topic_value = topic_data['name']
+                search_terms = topic_data['searchTerms']
+                
+                try:
+                    logger.info(f"Processing topic: {topic_value}")
+                    
+                    # Fetch news articles
+                    articles = await self.news_fetcher.search_news(search_terms, "week")
+                    if not articles:
+                        logger.warning(f"No articles found for topic: {topic_value}")
+                        continue
+                        
+                    logger.info(f"Found {len(articles)} articles for topic: {topic_value}")
+                    
+                    # Extract content from articles
+                    processed_articles = []
+                    for article in articles:
+                        try:
+                            content = await self.content_extractor.extract_content(article['link'])
+                            if content:
+                                processed_article = {
+                                    **article,
+                                    **content
+                                }
+                                processed_articles.append(processed_article)
+                        except Exception as e:
+                            logger.error(f"Error extracting content for article: {str(e)}")
+                            continue
+                    
+                    if not processed_articles:
+                        logger.warning(f"No content extracted for topic: {topic_value}")
+                        continue
+                        
+                    # Generate summary
+                    summary_result = await self.summarizer.batch_summarize(processed_articles)
+                    if not summary_result.get('summary'):
+                        logger.warning(f"No summary generated for topic: {topic_value}")
+                        continue
+                        
+                    topic_summaries[topic_value] = {
+                        'summary': summary_result['summary'],
+                        'articles': processed_articles
+                    }
+                    
+                    logger.info(f"Successfully processed topic: {topic_value}")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing topic {topic_value}: {str(e)}")
+                    continue
+            
+            # Step 4: Send emails to users for each topic
+            if topic_summaries:
+                logger.info("Starting email distribution")
+                
+                # Group users by topic
+                users_by_topic = {}
                 for user_doc in users:
                     user_data = user_doc.to_dict()
                     user_topic = user_data.get('topic')
-                    if user_topic in topic_articles:
-                        try:
-                            # Get articles for user's topic
-                            user_articles = topic_articles[user_topic]
-                            
-                            # Send email to user
-                            email_sent = await self.email_service.send_summary(
-                                user_articles[0].get('summary', ''),  # Using first article's summary
-                                user_articles,
-                                user_data['email'],
-                                user_data['name']
-                            )
-                            
-                            if email_sent:
-                                logger.info(f"Successfully sent email to {user_data['email']} for topic {user_topic}")
-                            else:
-                                logger.error(f"Failed to send email to {user_data['email']} for topic {user_topic}")
+                    if user_topic:
+                        if user_topic not in users_by_topic:
+                            users_by_topic[user_topic] = []
+                        users_by_topic[user_topic].append(user_data)
+                
+                # Send emails for each topic that has a summary
+                for topic, topic_data in topic_summaries.items():
+                    if topic in users_by_topic:
+                        logger.info(f"Sending emails for topic: {topic}")
+                        for user_data in users_by_topic[topic]:
+                            try:
+                                email_sent = await self.email_service.send_summary(
+                                    topic_data['summary'],
+                                    topic_data['articles'],
+                                    user_data['email'],
+                                )
                                 
-                        except Exception as e:
-                            logger.error(f"Error sending email to {user_data['email']}: {str(e)}")
-                            continue
+                                if email_sent:
+                                    logger.info(f"Successfully sent email to {user_data['email']} for topic {topic}")
+                                else:
+                                    logger.error(f"Failed to send email to {user_data['email']} for topic {topic}")
+                                    
+                            except Exception as e:
+                                logger.error(f"Error sending email to {user_data['email']}: {str(e)}")
+                                continue
                 
                 logger.info("Email distribution completed")
             
-            logger.info("News processing job completed successfully")
+            logger.info("Weekly news processing job completed successfully")
             
         except Exception as e:
             logger.error(f"Error in news processing job: {str(e)}")
             raise
+
+    def start(self):
+        """Start the scheduler."""
+        # Schedule job to run every Sunday at 7 AM ET
+        self.scheduler.add_job(
+            self.process_and_store_news,
+            CronTrigger(
+                day_of_week='sun',
+                hour=7,
+                minute=00,
+                timezone='America/New_York'
+            ),
+            id='weekly_news_processing',
+            name='Process and send weekly news',
+            replace_existing=True
+        )
+        
+        self.scheduler.start()
+        
+        logger.info("News scheduler started")
 
     def stop(self):
         """Stop the scheduler."""
