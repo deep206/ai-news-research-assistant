@@ -1,5 +1,3 @@
-I'll help you refine the project description and outline the architecture in a more structured way. Let me first create a more polished GitHub repository description:
-
 # AI News Research Assistant
 
 An intelligent, automated news aggregation and summarization system that delivers personalized news digests to your inbox. Powered by cutting-edge AI, this assistant scours the web for the latest developments in your chosen topics, distills the information into concise, insightful summaries, and delivers them weekly to keep you informed without the noise.
@@ -41,13 +39,12 @@ Now, let me outline the detailed architecture and design considerations:
         - `/unsubscribe` - User removal
         - `/test` - Admin testing endpoint
     - Scheduled job (Sunday 7am ET)
-    - Data encryption/decryption service
     - API rate limiting and quota management
 
 3. **Data Layer (Firebase)**
 
     - Collections:
-        - `users` - Encrypted user data
+        - `users` - User data
         - `topics` - Available news categories
         - `subscriptions` - User-topic mappings
 
@@ -62,7 +59,7 @@ Now, let me outline the detailed architecture and design considerations:
 
 1. **Data Protection**
 
-    - Encrypt user emails and names in Firebase
+    - User data in Firebase
     - Secure API key management
     - Environment variable protection
     - Input validation and sanitization
@@ -129,8 +126,8 @@ MAX_USERS=100
 // users collection
 {
   id: string,
-  encryptedEmail: string,
-  encryptedName: string,
+  email: string,
+  name: string,
   createdAt: timestamp,
   lastUpdated: timestamp
 }
