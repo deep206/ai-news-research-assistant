@@ -1,7 +1,7 @@
 """
 Main processor module that orchestrates the news processing pipeline.
 """
-from typing import List, Dict
+from typing import List, Dict, Any
 from .news_fetcher import NewsFetcher
 from .content_extractor import ContentExtractor
 from .summarizer import Summarizer
@@ -39,7 +39,7 @@ class Processor:
             
             # Step 2: Extract content from each article concurrently
             content_tasks = [
-                self.content_extractor.extract_content(article['link'])
+                await self.content_extractor.extract_content(article['link'])
                 for article in news_articles
             ]
             content_results = await asyncio.gather(*content_tasks, return_exceptions=True)
@@ -61,7 +61,7 @@ class Processor:
                 return []
             
             # Step 3: Generate summaries
-            summarized_articles = self.summarizer.batch_summarize(articles_with_content)
+            summarized_articles = await self.summarizer.batch_summarize(articles_with_content)
             
             # Add processing metadata
             for article in summarized_articles:
@@ -75,32 +75,71 @@ class Processor:
             logger.error(f"Error processing topic {topic}: {str(e)}")
             raise
 
-    async def process_topics(self, topics: List[str], time_period: str = "week") -> Dict[str, List[Dict]]:
+    async def process_topics(self, topics: Dict[str, str]) -> Dict[str, List[Dict[str, Any]]]:
         """
-        Process multiple topics and return results organized by topic.
+        Process multiple topics and return their articles.
         
         Args:
-            topics: List of topics to process
-            time_period: Time period for news (day, week, month)
+            topics: Dictionary mapping topic values to their search terms
             
         Returns:
-            Dictionary mapping topics to their processed articles
+            Dictionary mapping topic values to lists of processed articles
         """
         results = {}
         
-        # Process topics concurrently
-        topic_tasks = [
-            self.process_topic(topic, time_period)
-            for topic in topics
-        ]
-        topic_results = await asyncio.gather(*topic_tasks, return_exceptions=True)
-        
-        # Combine results
-        for topic, result in zip(topics, topic_results):
-            if isinstance(result, Exception):
-                logger.error(f"Failed to process topic {topic}: {str(result)}")
-                results[topic] = []
-            else:
-                results[topic] = result
+        for topic_value, search_terms in topics.items():
+            try:
+                logger.info(f"Processing topic: {topic_value}")
+                
+                # Fetch news articles for the topic
+                articles = await self.news_fetcher.search_news(search_terms)
+                if not articles:
+                    logger.warning(f"No articles found for topic: {topic_value}")
+                    results[topic_value] = []
+                    continue
+                
+                # Process and summarize articles
+                processed_articles = []
+                for article in articles:
+                    try:
+                        # Validate article data
+                        if not article or not isinstance(article, dict):
+                            logger.warning("Invalid article data received")
+                            continue
+                            
+                        url = article.get('url')
+                        if not url:
+                            logger.warning("Article missing URL")
+                            continue
+                            
+                        # Extract article content
+                        content = await self.content_extractor.extract_content(url)
+                        if not content:
+                            logger.warning(f"Failed to extract content from URL: {url}")
+                            continue
+                        
+                        # Generate summary
+                        summary = await self.summarizer.summarize(content)
+                        
+                        # Combine article data with content and summary
+                        processed_article = {
+                            **article,
+                            'content': content,
+                            'summary': summary
+                        }
+                        processed_articles.append(processed_article)
+                        
+                    except Exception as e:
+                        logger.error(f"Error processing article: {str(e)}")
+                        continue
+                
+                # Use the topic value (string) as the key
+                results[topic_value] = processed_articles
+                logger.info(f"Successfully processed {len(processed_articles)} articles for topic: {topic_value}")
+                
+            except Exception as e:
+                logger.error(f"Error processing topic {topic_value}: {str(e)}")
+                results[topic_value] = []
+                continue
         
         return results 
