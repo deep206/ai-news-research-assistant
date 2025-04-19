@@ -6,6 +6,7 @@ from typing import Dict, Optional, List
 import google.generativeai as genai
 import logging
 import asyncio
+import tiktoken
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,10 @@ class Summarizer:
         # Configure the Gemini API
         genai.configure(api_key=self.api_key)
         self.model = genai.GenerativeModel(os.getenv('GEMINI_MODEL'))
+        
+        # Token limit configuration
+        self.max_tokens = 50000  # Conservative limit for Gemini 1.5 Flash
+        self.encoding = tiktoken.get_encoding("cl100k_base")  # Using OpenAI's encoding as a proxy
         
         # Define the summarization prompt
         self.summary_prompt = """
@@ -43,6 +48,52 @@ class Summarizer:
         Articles:
         {content}
         """
+
+    def _count_tokens(self, text: str) -> int:
+        """Count the number of tokens in a text string."""
+        return len(self.encoding.encode(text))
+
+    def _chunk_articles(self, articles: List[Dict], max_tokens: int) -> List[List[Dict]]:
+        """
+        Split articles into chunks that fit within the token limit.
+        
+        Args:
+            articles: List of article dictionaries
+            max_tokens: Maximum number of tokens per chunk
+            
+        Returns:
+            List of article chunks
+        """
+        chunks = []
+        current_chunk = []
+        current_tokens = 0
+        
+        for article in articles:
+            # Format article content
+            article_text = (
+                f"Title: {article.get('title', 'Untitled')}\n"
+                f"Source: {article.get('source', 'Unknown')}\n"
+                f"Date: {article.get('date', 'Unknown')}\n"
+                f"Content: {article.get('content', '')}\n"
+                f"Link: {article.get('link', '')}"
+            )
+            
+            article_tokens = self._count_tokens(article_text)
+            
+            # If adding this article would exceed the limit, start a new chunk
+            if current_tokens + article_tokens > max_tokens and current_chunk:
+                chunks.append(current_chunk)
+                current_chunk = []
+                current_tokens = 0
+            
+            current_chunk.append(article)
+            current_tokens += article_tokens
+        
+        # Add the last chunk if it's not empty
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        return chunks
 
     async def summarize(self, content: Dict) -> Optional[Dict]:
         """
@@ -101,32 +152,58 @@ class Summarizer:
             
             logger.info(f"Starting batch summarization for {len(contents)} articles")
             
-            # Combine all article content into a single string
-            combined_content = "\n\n---\n\n".join([
-                f"Title: {article.get('title', 'Untitled')}\n"
-                f"Source: {article.get('source', 'Unknown')}\n"
-                f"Date: {article.get('date', 'Unknown')}\n"
-                f"Content: {article.get('content', '')}\n"
-                f"Link: {article.get('link', '')}"
-                for article in contents
-            ])
+            # Split articles into chunks if needed
+            chunks = self._chunk_articles(contents, self.max_tokens)
             
-            # Create a single summary for all articles
-            summary_prompt = self.summary_prompt.format(content=combined_content)
-            response = await asyncio.to_thread(self.model.generate_content, summary_prompt)
+            if len(chunks) > 1:
+                logger.info(f"Articles split into {len(chunks)} chunks due to token limit")
             
-            if not response.text:
-                logger.error("No summary generated for batch")
+            # Process each chunk and combine summaries
+            chunk_summaries = []
+            for i, chunk in enumerate(chunks, 1):
+                logger.info(f"Processing chunk {i}/{len(chunks)} with {len(chunk)} articles")
+                
+                # Combine chunk content
+                combined_content = "\n\n---\n\n".join([
+                    f"Title: {article.get('title', 'Untitled')}\n"
+                    f"Source: {article.get('source', 'Unknown')}\n"
+                    f"Date: {article.get('date', 'Unknown')}\n"
+                    f"Content: {article.get('content', '')}\n"
+                    f"Link: {article.get('link', '')}"
+                    for article in chunk
+                ])
+                
+                # Generate summary for this chunk
+                summary_prompt = self.summary_prompt.format(content=combined_content)
+                response = await asyncio.to_thread(self.model.generate_content, summary_prompt)
+                
+                if response.text:
+                    chunk_summaries.append(response.text.strip())
+            
+            if not chunk_summaries:
+                logger.error("No summaries generated for any chunks")
                 return {
-                    "summary": "Failed to generate summary",
+                    "summary": "Failed to generate summaries",
                     "articles": contents
                 }
+            
+            # If we have multiple chunks, combine their summaries
+            if len(chunk_summaries) > 1:
+                logger.info("Combining summaries from multiple chunks")
+                final_prompt = self.summary_prompt.format(
+                    content="\n\n---\n\n".join(chunk_summaries)
+                )
+                final_response = await asyncio.to_thread(self.model.generate_content, final_prompt)
+                final_summary = final_response.text.strip() if final_response.text else "Failed to combine summaries"
+            else:
+                final_summary = chunk_summaries[0]
             
             logger.info("Successfully generated comprehensive summary")
             
             return {
-                "summary": response.text.strip(),
-                "articles": contents
+                "summary": final_summary,
+                "articles": contents,
+                "chunks_processed": len(chunks)
             }
             
         except Exception as e:
