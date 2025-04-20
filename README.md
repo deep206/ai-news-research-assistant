@@ -1,6 +1,52 @@
 # AI News Research Assistant
 
-An intelligent, automated news aggregation and summarization system that delivers personalized news digests to your inbox. Powered by cutting-edge AI, this assistant scours the web for the latest developments in your chosen topics, distills the information into concise, insightful summaries, and delivers them weekly to keep you informed without the noise.
+An intelligent, automated news aggregation and summarization system that delivers personalized news digests to your inbox every Sunday at 7am ET,. Powered by cutting-edge AI, this assistant scours the web for the latest developments in your chosen topics, distills the information into concise, insightful summaries, and delivers them weekly to keep you informed without the noise.
+
+## [Live Demo Available Here](https://ai-news-research-assistant.web.app)
+
+#### Please note that this is a research projects so I have set maximum user limit due to cost constraints. [Please email me directly](mailto:deep@currently.com) if you are interested in contributing or supporting me. Thank you!
+
+## Local Development
+
+### Make sure you have following dependencies installed in your machine
+
+    - Git, Python (v3.10+), Node version 18+
+
+1. Fork and clone repo
+2. Open terminal
+3. For Front end setup, run following commands from project root:
+    - `cd frontend` // navigate to frontend directory
+    - `npm install`
+    - `npm start` // this will run your frontend on localhost, for example: (http://localhost:3000)
+4. For backend setup, run following commands from project root:
+    - `cd backend` // navigate to backend directory
+    - `python` -m venv venv
+    - `source venv/bin/activate`
+    - `python --version`
+    - `pip install -r requirements.txt`
+    - `python -m src.app` // this will initialize app file and run server locally, for example: (http://localhost:5000)
+5. Have fun playing with the source code. Cheers!
+
+## Deployment
+
+### Frontend (Firebase)
+
+1. Open terminal and run following commands
+2. npm install -g firebase-tools
+3. firebase login
+4. firebase init // select Hosting option
+5. firebase deploy
+
+### Backend (Render)
+
+1. Create a new Web Service on Render
+2. Connect your GitHub repository
+3. Set the following environment variables:
+    - `FLASK_APP=src.app:create_app()`
+    - `FLASK_ENV=production`
+    - `GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account.json`
+    - Other required environment variables from `.env.example`
+4. Deploy the service
 
 ## Key Features
 
@@ -139,26 +185,3 @@ MAX_USERS=100
   isActive: boolean    // Whether the topic is available for subscription
 }
 ```
-
-## Deployment
-
-### Frontend (GitHub Pages)
-
-1. Create a new repository on GitHub
-2. Push your code to the repository
-3. Go to repository Settings > Pages
-4. Under "Source", select "GitHub Actions"
-5. The frontend will automatically deploy to GitHub Pages when you push to the main branch
-
-The frontend will be available at: `https://your-github-username.github.io/ai-news-research-assistant`
-
-### Backend (Render)
-
-1. Create a new Web Service on Render
-2. Connect your GitHub repository
-3. Set the following environment variables:
-    - `FLASK_APP=src.app:create_app()`
-    - `FLASK_ENV=production`
-    - `GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account.json`
-    - Other required environment variables from `.env.example`
-4. Deploy the service
