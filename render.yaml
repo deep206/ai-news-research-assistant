@@ -59,3 +59,11 @@ services:
             sync: false
           - key: NODE_ENV
             sync: false
+          - key: SCHEDULER_TIMEZONE
+            sync: false
+          - key: SCHEDULER_DAY
+            sync: false
+          - key: SCHEDULER_HOUR
+            sync: false
+          - key: SCHEDULER_MINUTE
+            sync: false
