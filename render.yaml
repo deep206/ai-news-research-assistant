@@ -1,0 +1,65 @@
+services:
+    - type: web
+      name: ai-news-research-assistant-backend
+      env: python
+      buildCommand: |
+          cd backend
+          pip install -r requirements.txt
+      startCommand: |
+          cd backend
+          gunicorn src.app:create_app() --bind 0.0.0.0:$PORT
+      envVars:
+          - key: FLASK_APP
+            value: src.app:create_app()
+          - key: FLASK_ENV
+            value: production
+          - key: GOOGLE_APPLICATION_CREDENTIALS
+            value: /opt/render/project/src/backend/service-account.json
+          - key: FIREBASE_API_KEY
+            sync: false
+          - key: FIREBASE_AUTH_DOMAIN
+            sync: false
+          - key: FIREBASE_PROJECT_ID
+            sync: false
+          - key: FIREBASE_STORAGE_BUCKET
+            sync: false
+          - key: FIREBASE_MESSAGING_SENDER_ID
+            sync: false
+          - key: FIREBASE_APP_ID
+            sync: false
+          - key: FIREBASE_PRIVATE_KEY_ID
+            sync: false
+          - key: FIREBASE_PRIVATE_KEY
+            sync: false
+          - key: FIREBASE_CLIENT_EMAIL
+            sync: false
+          - key: FIREBASE_CLIENT_ID
+            sync: false
+          - key: FIREBASE_CLIENT_CERT_URL
+            sync: false
+          - key: SERPAPI_KEY
+            sync: false
+          - key: BREVO_API_KEY
+            sync: false
+          - key: FROM_EMAIL
+            sync: false
+          - key: FRONTEND_URL
+            sync: false
+          - key: GEMINI_API_KEY
+            sync: false
+          - key: GEMINI_MODEL
+            sync: false
+          - key: ADMIN_PWD
+            sync: false
+          - key: SEND_TEST_EMAIL_TO
+            sync: false
+          - key: MAX_USERS
+            sync: false
+          - key: ENCRYPTION_KEY
+            sync: false
+          - key: SECRET_KEY
+            sync: false
+          - key: PORT
+            sync: false
+          - key: NODE_ENV
+            sync: false
