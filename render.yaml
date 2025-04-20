@@ -1,15 +1,9 @@
 services:
     - type: web
       name: ai-news-research-assistant-backend
-      env: python
-      pythonVersion: "3.13"
-      buildCommand: |
-          cd backend
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      startCommand: |
-          cd backend
-          gunicorn --bind 0.0.0.0:$PORT src.app:create_app() --worker-class quart.worker.GunicornWorker
+      env: docker
+      dockerfilePath: ./backend/Dockerfile
+      dockerCommand: gunicorn --bind 0.0.0.0:$PORT src.app:create_app() --worker-class quart.worker.GunicornWorker
       envVars:
           - key: FLASK_APP
             value: src.app:create_app()
