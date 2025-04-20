@@ -159,10 +159,10 @@ class NewsScheduler:
         self.scheduler.add_job(
             self.process_and_store_news,
             CronTrigger(
-                day_of_week='sun',
-                hour=7,
-                minute=00,
-                timezone='America/New_York'
+                day_of_week=os.getenv('SCHEDULER_DAY'),
+                hour=os.getenv('SCHEDULER_HOUR'),
+                minute=os.getenv('SCHEDULER_MINUTE'),
+                timezone=os.getenv('SCHEDULER_TIMEZONE')
             ),
             id='weekly_news_processing',
             name='Process and send weekly news',

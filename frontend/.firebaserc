@@ -1,5 +1,18 @@
 {
   "projects": {
     "default": "ai-news-research-assistant"
-  }
+  },
+  "targets": {
+    "ai-news-research-assistant": {
+      "hosting": {
+        "subscribeainews": [
+          "subscribeainews"
+        ],
+        "ai-news-research-assistant": [
+          "ai-news-research-assistant"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
