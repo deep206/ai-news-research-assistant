@@ -2,7 +2,7 @@
     "name": "ai-news-research-assistant-frontend",
     "version": "0.1.0",
     "private": true,
-    "homepage": "https://deep206.github.io/ai-news-research-assistant",
+    "homepage": ".",
     "dependencies": {
         "@emotion/react": "^11.11.3",
         "@emotion/styled": "^11.11.0",
@@ -20,7 +20,8 @@
         "start": "react-scripts start",
         "build": "react-scripts build",
         "test": "react-scripts test",
-        "eject": "react-scripts eject"
+        "eject": "react-scripts eject",
+        "deploy": "npm run build && firebase deploy --only hosting"
     },
     "eslintConfig": {
         "extends": [

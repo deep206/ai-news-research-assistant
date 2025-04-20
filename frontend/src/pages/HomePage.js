@@ -116,7 +116,7 @@ const HomePage = () => {
           AI News Research Assistant
         </Typography>
         <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 4 }}>
-          Effortlessly stay informed! This automated AI-powered assistant scours the web for the latest news on your chosen topics, distills the key insights into concise summaries, and delivers them straight to your inbox. Perfect for researchers, professionals, and anyone who wants to keep up with the news—without the noise.
+          Effortlessly stay informed! This automated AI-powered assistant scours the web for the latest news on your chosen topics, distills the key insights into concise summaries, and delivers them every Sunday at 7am ET, straight to your inbox. Perfect for researchers, professionals, and anyone who wants to keep up with the news—without the noise.
         </Typography>
 
         {message.text && (

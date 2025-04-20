@@ -99,7 +99,7 @@ async def subscribe():
             if total_users >= int(os.getenv('MAX_USERS', 5)):
                 return {
                     'error': 'Maximum user limit reached',
-                    'message': 'Apologies for the inconvenience, this is a research project and we have reached maximum user limit due to cost constraints! Please try again later. Please reach out to me directly if interested in supporting me!'
+                    'message': 'Apologies for the inconvenience, this is a research project and we have reached maximum user limit due to cost constraints! Please try again later. Please reach out to me directly if interested in supporting me at deep@currently.com!'
                 }, 403
             
             # Add new user
