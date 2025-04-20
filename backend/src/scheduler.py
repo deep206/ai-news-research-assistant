@@ -132,7 +132,8 @@ class NewsScheduler:
                             email_sent = await self.email_service.send_summary(
                                 topic_data['summary'],
                                 topic_data['articles'],
-                                user_data['email']
+                                user_data['email'],
+                                topic
                             )
                             
                             if email_sent:

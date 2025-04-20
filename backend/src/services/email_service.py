@@ -37,6 +37,13 @@ class EmailService:
         Returns:
             Formatted HTML string
         """
+        # Trim markdown code block markers if present
+        summary = summary.strip()
+        if summary.startswith('```html'):
+            summary = summary[7:]
+        if summary.endswith('```'):
+            summary = summary[:-3]
+        summary = summary.strip()
         
         # Start with the summary
         html_content = f"""
@@ -85,7 +92,7 @@ class EmailService:
         
         return html_content
 
-    async def send_summary(self, summary: str, articles: List[Dict], send_to_email: str) -> bool:
+    async def send_summary(self, summary: str, articles: List[Dict], send_to_email: str, topic: str) -> bool:
         """
         Send a summary email to the configured test email address.
         
@@ -107,7 +114,7 @@ class EmailService:
                     "email": os.getenv('FROM_EMAIL')
                 },
                 "to": [{"email": send_to_email}],
-                "subject": "Test News Summary",
+                "subject": f"Weekly News Summary for {topic}",
                 "htmlContent": html_content
             }
             
@@ -121,14 +128,14 @@ class EmailService:
             )
             
             if response.status_code == 201:
-                logger.info(f"Test email sent successfully to {send_to_email}")
+                logger.info(f"Email sent successfully to {send_to_email}")
                 return True
             else:
-                logger.error(f"Failed to send test email. Status code: {response.status_code}")
+                logger.error(f"Failed to send email. Status code: {response.status_code}")
                 logger.error(f"Response: {response.text}")
                 return False
                 
         except Exception as e:
-            logger.error(f"Error sending test email: {str(e)}")
+            logger.error(f"Error sending email: {str(e)}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             return False 

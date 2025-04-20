@@ -294,7 +294,8 @@ async def test_email():
         email_sent = await email_service.send_summary(
             summary_result['summary'],
             processed_articles,
-            send_to_email
+            send_to_email,
+            "Test Email Service AI News Research Assistant Project"
         )
         
         if not email_sent:
