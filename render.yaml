@@ -7,7 +7,7 @@ services:
           pip install -r requirements.txt
       startCommand: |
           cd backend
-          gunicorn src.app:create_app() --bind 0.0.0.0:$PORT
+          python -m src.app
       envVars:
           - key: FLASK_APP
             value: src.app:create_app()

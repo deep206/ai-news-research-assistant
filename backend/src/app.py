@@ -26,8 +26,16 @@ def create_app():
     # Create the Quart app
     app = Quart(__name__)
     
-    # Configure CORS
-    cors(app, allow_origin="*")
+    # Configure the app
+    app.config.update(
+        PROVIDE_AUTOMATIC_OPTIONS=True,
+        JSON_AS_ASCII=False,
+        JSON_SORT_KEYS=False,
+        JSONIFY_PRETTYPRINT_REGULAR=False
+    )
+    
+    # Initialize CORS
+    cors = cors(app, allow_origin="*")
     
     # Register blueprints
     app.register_blueprint(main_bp)
