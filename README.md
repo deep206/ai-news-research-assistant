@@ -139,3 +139,26 @@ MAX_USERS=100
   isActive: boolean    // Whether the topic is available for subscription
 }
 ```
+
+## Deployment
+
+### Frontend (GitHub Pages)
+
+1. Create a new repository on GitHub
+2. Push your code to the repository
+3. Go to repository Settings > Pages
+4. Under "Source", select "GitHub Actions"
+5. The frontend will automatically deploy to GitHub Pages when you push to the main branch
+
+The frontend will be available at: `https://your-github-username.github.io/ai-news-research-assistant`
+
+### Backend (Render)
+
+1. Create a new Web Service on Render
+2. Connect your GitHub repository
+3. Set the following environment variables:
+    - `FLASK_APP=src.app:create_app()`
+    - `FLASK_ENV=production`
+    - `GOOGLE_APPLICATION_CREDENTIALS=path/to/your/service-account.json`
+    - Other required environment variables from `.env.example`
+4. Deploy the service

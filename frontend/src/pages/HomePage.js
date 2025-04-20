@@ -10,6 +10,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import axios from 'axios';
+import config from '../config';
 
 const HomePage = () => {
   const [formData, setFormData] = useState({
@@ -27,7 +28,7 @@ const HomePage = () => {
   useEffect(() => {
     const fetchTopics = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/topics');
+        const response = await axios.get(`${config.apiUrl}/topics`);
         setTopics(response.data.topics);
         setTopicsError(null);
       } catch (error) {
@@ -51,7 +52,7 @@ const HomePage = () => {
     setMessage({ type: '', text: '' });
 
     try {
-      const response = await axios.post('http://localhost:5000/subscribe', formData);
+      const response = await axios.post(`${config.apiUrl}/subscribe`, formData);
       setMessage({ type: 'success', text: response.data.message });
       setShowUnsubscribe(false);
       // Clear form fields after successful subscription
@@ -74,7 +75,7 @@ const HomePage = () => {
   const handleUnsubscribe = async () => {
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:5000/unsubscribe', {
+      const response = await axios.post(`${config.apiUrl}/unsubscribe`, {
         email: formData.email,
         topic: formData.topic,
       });
@@ -96,7 +97,7 @@ const HomePage = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:5000/test', { password });
+      const response = await axios.post(`${config.apiUrl}/test`, { password });
       setMessage({ type: 'success', text: response.data.message });
     } catch (error) {
       setMessage({
