@@ -35,7 +35,7 @@ def create_app():
     )
     
     # Initialize CORS
-    cors = cors(app, allow_origin="*")
+    app = cors(app, allow_origin="*")
     
     # Register blueprints
     app.register_blueprint(main_bp)
