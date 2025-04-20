@@ -1,36 +1,59 @@
-name: Deploy to GitHub Pages
+# Simple workflow for deploying static content to GitHub Pages
+name: Deploy to Github Pages
 
 on:
-    push:
-        branches:
-            - main
+  # Runs on pushes targeting the default branch
+  push:
+    branches: ['main']
 
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets the GITHUB_TOKEN permissions to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+# Allow repo secrets
+env:
+  REACT_APP_API_URL: ${{secrets.REACT_APP_API_URL}}
+    
 jobs:
-    build-and-deploy:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v2
-
-            - name: Setup Node.js
-              uses: actions/setup-node@v2
-              with:
-                  node-version: "18"
-
-            - name: Install dependencies
-              run: |
-                  cd frontend
-                  npm install
-
-            - name: Build
-              run: |
-                  cd frontend
-                  npm run build
-
-            - name: Deploy to GitHub Pages
-              uses: peaceiris/actions-gh-pages@v3
-              with:
-                  github_token: ${{ secrets.GH_PAT }}
-                  publish_dir: ./frontend/build
-                  commit_message: "Deploy: ${{ github.event.head_commit.message }}"
-                  force: true
+  # Single deploy job since we're just deploying
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: |
+            cd frontend
+            npm install
+      - name: Build
+        run: |
+            cd frontend
+            npm run build
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          # Upload dist repository
+          path: './frontend/build'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
