@@ -4,7 +4,7 @@ An intelligent, automated news aggregation and summarization system that deliver
 
 ## [Live Demo Available Here](https://subscribeainews.web.app)
 
-#### Please note that this is a research projects so I have set maximum user limit due to cost constraints. [Please email me directly](mailto:deep@currently.com) if you are interested in contributing or supporting me. Thank you!
+#### Please note that this is a research project so I have throttled maximum users due to cost constraints. [Please email me directly](mailto:deep@currently.com) if you are interested in contributing or supporting me. Thank you!
 
 ## Local Development
 
@@ -18,7 +18,7 @@ An intelligent, automated news aggregation and summarization system that deliver
     - `cd frontend` // navigate to frontend directory
     - `npm install`
     - `npm start` // this will run your frontend on localhost, for example: (http://localhost:3000)
-4. For backend setup, run following commands from project root:
+4. For backend setup, login to free accounts and get API keys/secrets from SerpApi, Brevo and Gemini and replace values in ".env" file, then, run following commands from project root:
     - `cd backend` // navigate to backend directory
     - `python` -m venv venv
     - `source venv/bin/activate`
