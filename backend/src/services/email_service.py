@@ -16,6 +16,7 @@ class EmailService:
         load_dotenv()
         self.api_key = os.getenv('BREVO_API_KEY')
         self.frontend_url = os.getenv('FRONTEND_URL')
+        self.backend_url = os.getenv('BACKEND_URL')
         if not self.api_key:
             raise ValueError("BREVO_API_KEY environment variable is not set")
         
@@ -62,6 +63,9 @@ class EmailService:
             </style>
         </head>
         <body>
+            <div>
+                <h1>Hey there! 🙋</h1>
+            </div>
             <div class="summary">
                 {summary}
             </div>
@@ -83,8 +87,8 @@ class EmailService:
         html_content += f"""
             </div>
             <div class="footer">
-                <p>This is an automated newsletter from AI News Research Assistant.</p>
-                <p>To unsubscribe, please visit our website or <a href="{self.frontend_url}/unsubscribe-email?email={send_to_email}">click here</a>.</p>
+                <p>This is an automated AI generated newsletter from <a href="{self.frontend_url}">Subscribe to AI Newsletter by Deep Patel</a>.</p>
+                <p>To unsubscribe, please visit our website or <a href="{self.backend_url}/unsubscribe-email?email={send_to_email}">click here</a>.</p>
             </div>
         </body>
         </html>
@@ -110,7 +114,7 @@ class EmailService:
             # Prepare email data
             email_data = {
                 "sender": {
-                    "name": "AI News Research Assistant",
+                    "name": "Subscribe to AI Newsletter by Deep Patel",
                     "email": os.getenv('FROM_EMAIL')
                 },
                 "to": [{"email": send_to_email}],
