@@ -1,4 +1,4 @@
-# AI News Research Assistant
+# Subscribe to AI Newsletter!
 
 An intelligent, automated news aggregation and summarization system that delivers personalized news digests to your inbox every Sunday at 7am ET,. Powered by cutting-edge AI, this assistant scours the web for the latest developments in your chosen topics, distills the information into concise, insightful summaries, and delivers them weekly to keep you informed without the noise.
 
@@ -20,7 +20,7 @@ An intelligent, automated news aggregation and summarization system that deliver
     - `npm start` // this will run your frontend on localhost, for example: (http://localhost:3000)
 4. For backend setup, login to free accounts and get API keys/secrets from SerpApi, Brevo and Gemini and replace values in ".env" file, then, run following commands from project root:
     - `cd backend` // navigate to backend directory
-    - `python` -m venv venv
+    - `python -m venv venv`
     - `source venv/bin/activate`
     - `python --version`
     - `pip install -r requirements.txt`
