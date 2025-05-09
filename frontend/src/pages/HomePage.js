@@ -24,6 +24,7 @@ const HomePage = () => {
   const [topics, setTopics] = useState([]);
   const [topicsLoading, setTopicsLoading] = useState(true);
   const [topicsError, setTopicsError] = useState(null);
+  const github_url = 'https://github.com/deep206/subscribe-to-ai-news';
 
   useEffect(() => {
     const fetchTopics = async () => {
@@ -112,11 +113,14 @@ const HomePage = () => {
   return (
     <Container maxWidth="md">
       <Box sx={{ my: 4, textAlign: 'center' }}>
-        <Typography variant="h1" component="h1" gutterBottom>
-          AI News Research Assistant
+        <Typography variant="h1" component="h1" gutterBottom sx={{ mb: 2 }}>
+          Subscribe to AI Newsletter!
         </Typography>
-        <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 4 }}>
-          Effortlessly stay informed! This automated AI-powered assistant scours the web for the latest news on your chosen topics, distills the key insights into concise summaries, and delivers them every Sunday at 7am ET, straight to your inbox. Perfect for researchers, professionals, and anyone who wants to keep up with the news—without the noise.
+        <Typography variant="h2" component="h3" gutterBottom sx={{ mb: 2 }}>
+          Effortlessly stay informed.
+        </Typography>
+        <Typography variant="h5" component="h5" gutterBottom sx={{ mb: 4 }}>
+          This automated AI-powered service scours the web for the latest news on your chosen topics, distills the key insights into concise summaries, and delivers them every Sunday straight to your inbox. Perfect for researchers, professionals, and anyone who wants to keep up with the news—without the noise.
         </Typography>
 
         {message.text && (
@@ -210,6 +214,11 @@ const HomePage = () => {
             Test Email
           </Button>
         )}
+        <div style={{ marginTop: '2em' }}>
+          <Typography variant="b1" component="b1">
+            Built with ❤️ / &copy; {new Date().getFullYear()} Deep Patel / <a href={github_url} target='_blank' rel="noreferrer" style={{ textDecoration: 'none', color: 'blue' }}>Source code</a>
+          </Typography>
+        </div>
       </Box>
     </Container>
   );
