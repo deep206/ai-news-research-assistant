@@ -21,7 +21,7 @@ An intelligent, automated news aggregation and summarization system that deliver
 4. For backend setup, login to free accounts and get API keys/secrets from SerpApi, Brevo and Gemini and replace values in ".env" file, then, run following commands from project root:
     - `cd backend` // navigate to backend directory
     - `python -m venv venv`
-    - `source venv/bin/activate`
+    - `source venv/Source/activate`
     - `python --version`
     - `pip install -r requirements.txt`
     - `python -m src.app` // this will initialize app file and run server locally, for example: (http://localhost:5000)
